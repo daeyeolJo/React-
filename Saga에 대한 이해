@@ -1,0 +1,69 @@
+출처: https://mskims.github.io/redux-saga-in-korean/
+
+class UserComponent extends React.Component {
+  ...
+  onSomeButtonClicked() {
+    const { userId, dispatch } = this.props
+    
+    // 1. 이 액션이 dispatch된다. 
+    dispatch({type: 'USER_FETCH_REQUESTED', payload: {userId}})
+  }
+  ...
+}
+
+//sagas.js
+
+import { call, put, takeEvery, takeLatest } from 'redux-saga/effects'
+import Api from '...'
+
+//3. 호출되고, USER_FETCH_SUCCEEDED, USER_FETCH_FAILED 타입 액션을 디스패치할 것이다. 비동기적 처리. 
+// worker Saga: USER_FETCH_REQUESTED 액션에 대해 호출될 것입니다
+function* fetchUser(action) {
+   try {
+      const user = yield call(Api.fetchUser, action.payload.userId);
+      yield put({type: "USER_FETCH_SUCCEEDED", user: user});
+   } catch (e) {
+      yield put({type: "USER_FETCH_FAILED", message: e.message});
+   }
+}
+
+/*
+  각각의 dispatch 된 `USER_FETCH_REQUESTED` 액션에 대해 fetchUser를 실행합니다.
+  동시에 user를 fetch하는 것을 허용합니다.
+*/
+
+//2. fetchUser가 호출된다! 
+function* mySaga() {
+  yield takeEvery("USER_FETCH_REQUESTED", fetchUser);
+}
+
+/*
+  또는 takeLatest를 사용할 수 있습니다.
+
+  동시에 user를 fetch하는 것을 허용하지 않습니다. 만약 fetch가 이미 대기 상태일 때  "USER_FETCH_REQUESTED"가 dispatch가 되었다면 대기 상태의 fetch는 취소되고 항상 최근 것만이 실행됩니다.
+*/
+function* mySaga() {
+  yield takeLatest("USER_FETCH_REQUESTED", fetchUser);
+}
+
+export default mySaga;
+
+//main.js
+import { createStore, applyMiddleware } from 'redux'
+import createSagaMiddleware from 'redux-saga'
+
+import reducer from './reducers'
+import mySaga from './sagas'
+
+// saga 미들웨어를 생성합니다.
+const sagaMiddleware = createSagaMiddleware()
+// 스토어에 mount 합니다.
+const store = createStore(
+  reducer,
+  applyMiddleware(sagaMiddleware)
+)
+
+// 그리고 saga를 실행합니다.
+sagaMiddleware.run(mySaga)
+
+// 애플리케이션을 render합니다.
